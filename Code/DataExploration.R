@@ -20,6 +20,7 @@
 
 library(rjson)
 library(plyr)
+library(Hmisc)
 if(!require('BBmisc')){
     install.packages('BBmisc',dep=TRUE)
 }
@@ -36,62 +37,59 @@ registerDoParallel(cores=4)
 # save.image(paste0(getwd(),'/Capstone_Quiz.RData'))
 load(paste0(getwd(),'/Capstone_Quiz.RData'))
 
+user <- dat[['user']]
+check <- dat[['checkin']]
+bus <- dat[['business']]
+reviews <- dat[['review']]
+df.rev  <- data.frame(users = reviews$user_id, stars=reviews$stars, type = reviews$type,
+                      business = reviews$business_id, 
+                      date=as.Date(as.POSIXlt(strptime(reviews$date, "%Y-%m-%d"))))
+
+categories <- unique(as.vector(unlist(bus$categories)))
+df.cat <- data.frame(cat=categories)
+write.table(df.cat,"Categories.csv",sep=";",dec=".", row.names = F)
+FoodCat<- read.csv("FoodStuff.csv",sep = ";", dec = ".")
+
+foodcat <- as.vector(FoodCat$Cat)
+bus.selection <- bus["Bars" %in% as.vector(unlist(bus$categories)),]
+
+isFoodRelated <- sapply(1:nrow(bus), function(x) sum(foodcat %in% unlist(bus$categories[x])) >0)
+bus.selec <- bus[isFoodRelated,]
+bus.narrowed <- data.frame(buID= bus.selec$business_id, revCnt=bus.selec$review_count)
+
+ambiences <- c("romantic", "intimate", "classy", "hipster", "divey", "touristy", "trendy", "upscale", "casual")
+restrictions <- c("dairy-free", "gluten-free", "vegan", "kosher", "halal", "soy-free", "vegetarian")
+for(i in 1:length(ambiences)){
+    bus.narrowed[[ambiences[i]]] <- as.numeric(bus.selec$attributes$'Ambience'[[ambiences[i]]])
+}
+for(i in 1:length(restrictions)){
+    bus.narrowed[[restrictions[i]]] <- as.numeric(bus.selec$attributes$'Dietary Restrictions'[[restrictions[i]]])
+}
 
 
+rev.sm <- reviews[, which(names(reviews) %in% c("user_id", "stars", "business_id"))]
 
 
-file <- paste(getwd(),'/Data/yelp_academic_dataset_user.json', sep="")
-conn <- file(file, "r")
-input <- readLines(conn, -1L)
-test <- lapply(input, fromJSON)
-test <- lapply(test, cbind)
-test <- as.data.frame(test)
-test <- as.data.frame(t(test))
-row.names(test) <- seq(1, nrow(test))
-save(test, file = "user.RData")
+busids <- rev.sm$business_id
+pos.bus<- match(busids,bus.narrowed$buID)
+userids <- rev.sm$user_id
+pos.user<- match(userids,user$user_id)
+
+length(unique(rev.sm$user_id))
 
 
-file <- paste(getwd(),'/Data/yelp_academic_dataset_review.json', sep="")
-conn <- file(file, "r")
-input <- readLines(conn, -1L)
-test <- lapply(input, fromJSON)
-test <- lapply(test, cbind)
-test <- as.data.frame(test)
-test <- as.data.frame(t(test))
-row.names(test) <- seq(1, nrow(test))
-save(test, file = "review.RData")
+df.positions <- data.frame(pos.bus = pos.bus, busID= busids, pos.users = pos.user, userids=userids)
+df.pos.comp <- na.omit(df.positions)
+bus.narrowed$busID <- bus.narrowed$buID
+df.bu <- merge(df.pos.comp, bus.narrowed, by="busID")
+df.bu2 <- df.bu[, -which(names(df.bu) %in% c("busID", "pos.bus", "pos.users","buID"))]
+df.bu2 <- na.omit(df.bu2)
+df.bu2$nrev <- rep(1,nrow(df.bu2))
 
-file <- paste(getwd(),'/Data/yelp_academic_dataset_business.json', sep="")
-conn <- file(file, "r")
-input <- readLines(conn, -1L)
-test <- lapply(input, fromJSON)
-test <- lapply(test, cbind)
-test <- as.data.frame(test)
-test <- as.data.frame(t(test))
-row.names(test) <- seq(1, nrow(test))
-save(test, file = "business.RData")
-load("business.RData")
+library(plyr)
+df.bu3 <- ddply(df.bu2,"userids",numcolwise(sum))
+names(df.bu3)[names(df.bu3) == 'userids'] <- 'user_id'
+df.bu4 <- merge(user,df.bu3, by="user_id")
 
 
-#'@ fnames <- c('business','checkin','review','tip','user')
-#'@ jfile <- paste0(getwd(),'/yelp_dataset_challenge_academic_dataset/yelp_academic_dataset_',fnames,'.json')
-#'@ dat <- llply(as.list(jfile), function(x) stream_in(file(x),pagesize = 10000))
-#'@ names(dat) <- fnames
-
-## Since read the json files will cost us few minutes time, here I save as .RData will be faster.
-#'@ save.image(paste0(getwd(),'/Capstone_Quiz.RData'))
-
-tmp <- unlist(test$attributes, use.names = FALSE)
-table(tmp) 
-7323/61184
-
-
-length(na.omit(dat[['business']]$attributes$'Wi-Fi'[dat[['business']]$attributes$'Wi-Fi'=='free']))/length(na.omit(dat[['business']]$attributes$'Wi-Fi'=='free')) * 100
-
-
-
-
-
-write.table(test,paste(getwd(),'/Data/yelp_review.csv', sep="")
-            ,sep=";",dec=".", row.names = F)
 
