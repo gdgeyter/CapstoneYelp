@@ -1,0 +1,138 @@
+---
+title: "Data Science Capstone Project Report"
+author: "Gert De Geyter"
+date: "Sunday, November 22, 2015"
+output:
+  pdf_document:
+    fig_caption: yes
+---
+
+# Title 
+
+This is the final report written for the Capstone project for the Coursera Data 
+Science Specialization. In this project we use the data made public for the 
+[Yelp Dataset Challenge][1]. The main focus of this report is based on 
+identifying and clustering groups of people with similar interests in food and 
+environment. Additionally we will also investigate if some overlap exists 
+between different groups (for example a "vegan" and "hispters" group could 
+partially overlap).
+
+# Introduction
+
+In this project we try to answer the question if there are clearly separated
+groups of people and their preferences of both dietary restrictions and the 
+environment. For example a related question would be "Do vegetarians have a 
+preferences for hipster places?". The reason why this question could be 
+interesting is for better customer profiling. For example, in the above case
+vegetarian restaurants could target potential customers more accurately, 
+increasing their publicity with minimal cost. Not only would they be able to 
+address new clients, they could also better suit the needs and wishes of the 
+existing customers. In this way they could build up the returning customer base
+which is vital for any restaurant to produce steady cash flows and remain open
+for business.
+
+To answer these questions we use a combination of three different data sets from
+the [Yelp Dataset Challenge][1]:
+
+1. yelp_academic_dataset_user.json
+2. yelp_academic_dataset_review.json
+3. yelp_academic_dataset_business.json
+
+![Schematic overview of merging and linking of datasets](Yelp2.PNG)
+
+Figure 1 shows a schematic overview of how we link the different data sets in 
+order to get all of the necessary data combined before we move to the analysis.
+As this project is specifically focused on food, we first narrow down to the 
+reviews for business who are clearly based on preparing food (and not for 
+example specific food shops). From the different categories of businesses
+we have manually selected all relevant ones to narrow down the selection.
+As this data set includes the environment (essentially the 'Ambience') and 
+'Dietary Restrictions' it is important to take this information and link it to 
+a specific user. 
+
+The next step consists of merging the reviews with the food selected business. 
+We need this merging for two reasons:
+
+1. Not all the reviews were written on a business we are interested in
+2. The reviews contain the link between businessID and userID
+
+Once we have merged the business and reviews data set we get rid of all the 
+information we don't need for our analysis, like the text of the review it self.
+Doing so we create lighter data frame which should be easier to handle in the 
+upcoming steps. The next step consists of merging the newly created dataframe of 
+relevant reviews with the dataset containing the users information. This can be 
+easily done by merging using the userid. The last thing we have to do is then 
+aggregate this frame to have one line per unique user as this data frame still 
+contains multiple lines per review. However, what we need in the end is a 
+specific 'user-profile' so therefore we need to combine the
+several reviews into one. Each of these steps is explained in more detail in the 
+next chapter.
+
+# Methods and Data 
+
+In this section we dig a bit deeper into what manipulations we have to done
+reach to the 'user-profiles'. To keep this report light and within 5 page limit
+not all steps are included here. However, if not all steps are perfectly clear
+are the reader is interested in finding out specific details, feel free to look
+at the code posted on my [GitHub][2]. 
+
+We first start by loading the necessary packages, reading in the data files and 
+saving it so it can be loaded faster afterwards. 
+```{r, Read in Datasets, echo=TRUE, message=FALSE, eval=FALSE}
+if(!require('BBmisc')){
+    install.packages('BBmisc',dep=TRUE)
+}
+# load packages
+suppressPackageStartupMessages(library('BBmisc'))
+pkgs <- c('jsonlite','plyr','plyr','stringr','doParallel','ff','ffbase',
+          'corrplot','rjson','Hmisc')
+suppressAll(lib(pkgs)); rm(pkgs)
+registerDoParallel(cores=4)
+# .. cut part of the code here. see GitHub
+```
+Next we make the first selection 'Select Food related' on the business file to 
+select only the relevant food preparation business (i.e. any 'sort' of
+restaurant). The file 'FoodStuff.csv' contains a list of manually selected 
+relevant categories.
+
+```{r, Selection 1, echo=TRUE, message=FALSE, eval=FALSE}
+load(paste0(getwd(),'/Capstone_Quiz.RData'))
+user <- dat[['user']]
+bus <- dat[['business']]
+reviews <- dat[['review']]
+FoodCat<- read.csv("FoodStuff.csv",sep = ";", dec = ".")
+foodcat <- as.vector(FoodCat$Cat)
+isFoodRelated <- sapply(1:nrow(bus), function(x) sum(foodcat %in% unlist(bus$categories[x])) >0)
+bus.selec <- bus[isFoodRelated,]
+```
+The second step, 'Merge on business_ID', starts by making the 'ambience' and
+dietary restriction columns from boolean to numeric. This will be important
+in step 4. We first only select the columns we need from the reviews file.
+Next, we filter on those reviews which were written on relevant businesses.
+Finally we merge the reviews with the businesses file using the businessID.
+
+```{r, Selection 2, echo=TRUE, message=FALSE, eval=FALSE}
+rev.sm <- reviews[, which(names(reviews) %in% c("user_id", "stars", "business_id"))]
+busids <- rev.sm$business_id
+pos.bus<- match(busids,bus.narrowed$buID)
+userids <- rev.sm$user_id
+df.positions <- data.frame(pos.bus = pos.bus, busID= busids, userids=userids)
+df.pos.comp <- na.omit(df.positions)
+bus.narrowed$busID <- bus.narrowed$buID
+df.bu <- merge(df.pos.comp, bus.narrowed, by="busID")
+```
+
+# Results 
+
+Describe what you found through your analysis of the data.
+
+![The weighted correlation for different environments and dietary restrictions](corrplot.PNG)
+
+
+# Discussion 
+
+Explain how you interpret the results of your analysis and what the implications are for your question/problem.
+
+
+[1]: http://www.yelp.com/dataset_challenge "Yelp Dataset Challenge"
+[2]: https://github.com/gdgeyter/CapstoneYelp "GitHub"
