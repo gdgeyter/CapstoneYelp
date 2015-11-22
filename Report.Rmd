@@ -31,6 +31,8 @@ existing customers. In this way they could build up the returning customer base
 which is vital for any restaurant to produce steady cash flows and remain open
 for business.
 
+## Data merging and aggregating
+
 To answer these questions we use a combination of three different data sets from
 the [Yelp Dataset Challenge][1]:
 
@@ -59,17 +61,20 @@ We need this merging for two reasons:
 Once we have merged the business and reviews data set we get rid of all the 
 information we don't need for our analysis, like the text of the review it self.
 Doing so we create lighter data frame which should be easier to handle in the 
-upcoming steps. The next step consists of merging the newly created dataframe of 
-relevant reviews with the dataset containing the users information. This can be 
-easily done by merging using the userid. The last thing we have to do is then 
+upcoming steps. The next thing we have to do is then 
 aggregate this frame to have one line per unique user as this data frame still 
 contains multiple lines per review. However, what we need in the end is a 
 specific 'user-profile' so therefore we need to combine the
-several reviews into one. Each of these steps is explained in more detail in the 
-next chapter.
-
+several reviews into one. The final step remaining is to merge the newly created
+dataframe of relevant reviews with the dataset containing the users information.
+This can be easily done by merging using the userid. Each of these steps is 
+explained in more detail in the next chapter. Once the final frame is created we
+check if certain ambience and dietary restrictions have tendancy to occur more 
+or less frequently with others. However before we can do this it is important to
+make the necessary corrections on numbers as not all of them have the same 
+occurancy in the final data set. This will be discussed in the 'Results' 
+chapter.
 # Methods and Data 
-
 In this section we dig a bit deeper into what manipulations we have to done
 reach to the 'user-profiles'. To keep this report light and within 5 page limit
 not all steps are included here. However, if not all steps are perfectly clear
@@ -107,7 +112,7 @@ bus.selec <- bus[isFoodRelated,]
 ```
 The second step, 'Merge on business_ID', starts by making the 'ambience' and
 dietary restriction columns from boolean to numeric. This will be important
-in step 4. We first only select the columns we need from the reviews file.
+in step 3. We first only select the columns we need from the reviews file.
 Next, we filter on those reviews which were written on relevant businesses.
 Finally we merge the reviews with the businesses file using the businessID.
 
@@ -122,16 +127,111 @@ bus.narrowed$busID <- bus.narrowed$buID
 df.bu <- merge(df.pos.comp, bus.narrowed, by="busID")
 ```
 
+The third step consists of aggregating the multiple reviews per user into one.
+This can be done by simply stacking the ambience and dietary restrictions after
+converting them to a numeric value. So for example, if a user has written two
+reviews on a business categorized as 'trendy', the rows in the data frame will
+consists of one user only but the column 'trendy' will now contain '2' instead
+of 'TRUE'. The 4 step is then just to merge this data frame with the user data
+frame using the userid. 
+
+```{r, Selection 3 and 4, echo=TRUE, message=FALSE, eval=FALSE}
+df.bu2 <- df.bu[, -which(names(df.bu) %in% c("busID", "pos.bus","buID"))]
+df.bu2 <- na.omit(df.bu2)
+df.bu2$nrev <- rep(1,nrow(df.bu2))
+df.bu3 <- ddply(df.bu2,"userids",numcolwise(sum))
+names(df.bu3)[names(df.bu3) == 'userids'] <- 'user_id'
+df.bu4 <- merge(user,df.bu3, by="user_id")
+df.final <- df.bu4
+```
+
 # Results 
+```{r, readcol, echo=FALSE, message=FALSE, eval=TRUE, warning= FALSE}
+library(ggplot2)
+library(corrplot)
+df.colsums  <- read.csv("colsums .csv",sep = ";", dec = ".")
+df.envDiet  <- read.csv("envDiet .csv",sep = ";", dec = ".")
+corr.envDiet <- cor(df.envDiet)
+```
 
-Describe what you found through your analysis of the data.
+Now that we have created a final data frame containing all the information
+let's have a look at the frequency of all the different ambiences and dietary 
+restrictions.
 
-![The weighted correlation for different environments and dietary restrictions](corrplot.PNG)
+```{r, fig.height=4, fig.width=6, echo=FALSE, message=FALSE, fig.cap=" Frequency of Ambience and Dieterary restrictions among user profiles"}
+barplt <- ggplot(data = df.colsums, 
+                 aes(x = Environment, y=UserReviews)) + geom_bar(stat = "identity", fill="darkgreen",colour="darkgrey")+
+    xlab("Ambience and Dietary restrictions") +
+    ylab("User reviews") +
+    theme_bw()+theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+barplt
+```
+
+From Figure 2 one could assume that there are lot of vegetarians among the 
+users. However, it is important to notice that we have created these profiles 
+based on business traits. For example, a non-vegetarian could easily have a 
+hamburger in a place that also serves vegetarian dishes but obviously that does
+not make him a vegetarian. Therefore, before we can draw any conclusions on 
+which traits occur more (or less) frequently together we must weight this by
+the absolute occurence. This is shown in the following step. First we must
+correct the 'user-profile' by weighing the number of reviews he/she has written
+on a certain type of restaurant by the total number of reviews the user has 
+written. Next, this is also correct by the total amount of businesses having
+this specific trait. 
+
+```{r, Corrections, echo=TRUE, message=FALSE, eval=FALSE}
+for(i in 1:length(envDiet)){
+    df.final[[envDiet[i]]] <- df.final[[envDiet[i]]]/df.final$nrev
+    df.final[[envDiet[i]]] <- df.final[[envDiet[i]]]/sum(df.final[[envDiet[i]]])
+}
+```
+Now that we have the corrected/weighted occurences we can look at how frequently
+they appear together. This can be done by calculating the correlation matrix
+among all traits. This matrix will indicate a value between -1 to +1 indicating 
+how likely or unlikely two traits will pair up. This matrix can be seen in 
+Figure 3 and will be discussed in the next chapter.
+
+```{r, fig.height=3.5, fig.width=5, echo=FALSE, message=FALSE, fig.cap="Weighted correlation among different ambiences and dieterary restrictions"}
+corrplot(corr.envDiet, method = "ellipse")
+```
+
+\newpage
 
 
 # Discussion 
 
-Explain how you interpret the results of your analysis and what the implications are for your question/problem.
+Before we begin this dicussion it is important to notice 
+*Correlation is not causation*. Therefore, one should **ALWAYS** we very 
+careful when drawing conclusions from them. Because of this, and because of the
+smaller scale of this project, all the conclusions here will be expressed very
+conservativaly and should also be regarded as such. As a final remark, we will
+speak of f.e. 'romantic users' while it is important to remember that these are
+always trait of businesses were users go. However we use this to keep the 
+discussion light and not overly verbose.
+
+When looking at Figure 3 we notice a few things:
+
+1. Not suprisingly there is a high tendency for dietary restrictions to pair up. this is most likely partly due to an overlap in dietary restrictions (f.e. all vegans are vegetarians and dairy.free) and because of business specifically focussing more on several dietary restrictions.
+2. Romantic users tend to be more upscale. This might not be so suprising as most
+people won't take their dates out on a cheap, fast-food restaurant.
+3. Trendy people are more likely to be vegan and eat soy free.
+4. Casual users are less likely to be classy, hispters or trendy. Interestingly they have slightly higher tendency towards eating gluten free while being less likely to be vegan or vegetarian
+
+These are just a few first remarks that can be made. Because of the richness of 
+this Yelp dataset, much more questions could be answered. We believe that this 
+is just a potential start of investigating many tendencies among users and could
+easily be extendend. For example, not just looking at dietary restrictions but
+at specific cuisines like "Italian" and the business ambience. Having this 
+information could be an important tool for some businesses to adjust more to 
+their clients needs. For example, using conclusion 2 from this work, upscale 
+restaurants could focus specifically on advertising romantic dinners for two.
+This is just a small example of the amount of information that could be locked in this
+data set alone so imagine what could be learned if it was enriched with other data
+like geospatial information of social network interests. 
+
+
+
+
 
 
 [1]: http://www.yelp.com/dataset_challenge "Yelp Dataset Challenge"

@@ -17,7 +17,7 @@
 #------------------------------------------------------------------------------#
 ####                           Data Exploration                             ####
 #------------------------------------------------------------------------------#
-
+library(ggplot2)
 if(!require('BBmisc')){
     install.packages('BBmisc',dep=TRUE)
 }
@@ -75,10 +75,10 @@ df.positions <- data.frame(pos.bus = pos.bus, busID= busids, userids=userids)
 df.pos.comp <- na.omit(df.positions)
 bus.narrowed$busID <- bus.narrowed$buID
 df.bu <- merge(df.pos.comp, bus.narrowed, by="busID")
+
 df.bu2 <- df.bu[, -which(names(df.bu) %in% c("busID", "pos.bus","buID"))]
 df.bu2 <- na.omit(df.bu2)
 df.bu2$nrev <- rep(1,nrow(df.bu2))
-
 df.bu3 <- ddply(df.bu2,"userids",numcolwise(sum))
 names(df.bu3)[names(df.bu3) == 'userids'] <- 'user_id'
 df.bu4 <- merge(user,df.bu3, by="user_id")
@@ -86,16 +86,20 @@ envDiet <- c(ambiences,restrictions)
 
 df.envDiet.unscaled <- df.bu4[, which(names(df.bu4) %in% c(envDiet))]
 df.colsums <- data.frame(Environment= envDiet, UserReviews = as.numeric(colSums(df.envDiet.unscaled)))
+write.table(df.colsums ,"colsums .csv",sep=";",dec=".", row.names = F)
+df.colsums  <- read.csv("colsums .csv",sep = ";", dec = ".")
 
 barplt <- ggplot(data = df.colsums, 
                  aes(x = Environment, y=UserReviews)) + geom_bar(stat = "identity", fill="darkgreen",colour="darkgrey")+
-    xlab("Environment") +
-    ylab("UserReviews") +
-    theme_bw()
+    xlab("Ambience and Dietary restrictions") +
+    ylab("User reviews") +
+    theme_bw()+theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
 barplt
 
 
 df.final <- df.bu4
+
+
 
 for(i in 1:length(envDiet)){
     df.final[[envDiet[i]]] <- df.final[[envDiet[i]]]/df.final$nrev
@@ -105,8 +109,9 @@ df.envDiet <- df.final[, which(names(df.final) %in% c(envDiet))]
 
 
 df.envDiet <- df.envDiet[, -which(names(df.envDiet) %in% c("touristy"))]
+write.table(df.envDiet ,"envDiet .csv",sep=";",dec=".", row.names = F)
+df.envDiet  <- read.csv("envDiet .csv",sep = ";", dec = ".")
 corr.envDiet <- cor(df.envDiet)
-
 corrplot(corr.envDiet, method = "ellipse")
 
 

@@ -1,28 +1,82 @@
-CapstonePresentation
+Data Science Capstone Project Report
 ========================================================
-author: 
-date: 
+author: "Gert De Geyter"
+date: "Sunday, November 22, 2015"
 
-First Slide
-========================================================
-
-For more details on authoring R presentations click the
-**Help** button on the toolbar.
-
-- Bullet 1
-- Bullet 2
-- Bullet 3
-
-Slide With Code
+Capstone project
 ========================================================
 
-```{r}
-summary(cars)
+The main focus of this report is based on 
+identifying the relations users have to prefer certain businesses and
+traits like romantic, trendy, etc. and dietary restrictions.
+
+In this project we use the data made public for the 
+[Yelp Dataset Challenge](http://www.yelp.com/dataset_challenge) 
+
+The code and full report are available on my personal [GitHub](https://github.com/gdgeyter/CapstoneYelp)
+
+
+Data merging and aggregating
+========================================================
+As a first part of the project we combine the information coming from 
+three different data sources. Below a schematic overview of merging and linking
+the datasets is shown.
+
+<div align="center">
+<img src="Yelp.PNG" width=600 height=400>
+</div>
+
+
+Correlation
+========================================================
+<font size="4"> After obtaining the final data set we use the correlation matrix to look
+for tendencies of traits to pair up. Of course this correlation is first weighted
+by the amount of users writing reviews on business with these traits as well
+as the total amount of businesses having these traits.</font>
+
+
+
+```{r, readcol, echo=FALSE, message=FALSE, eval=TRUE, warning= FALSE}
+library(ggplot2)
+library(corrplot)
+df.colsums  <- read.csv("colsums .csv",sep = ";", dec = ".")
+df.envDiet  <- read.csv("envDiet .csv",sep = ";", dec = ".")
+corr.envDiet <- cor(df.envDiet)
+```
+```{r, fig.height=5, fig.width=7, echo=FALSE, message=FALSE, fig.cap="Weighted correlation among different ambiences and dieterary restrictions"}
+corrplot(corr.envDiet, method = "ellipse")
+```
+***
+
+```{r, fig.height=8.5, fig.width=7, echo=FALSE, message=FALSE, fig.cap=" Frequency of Ambience and Dieterary restrictions among user profiles"}
+barplt <- ggplot(data = df.colsums, 
+                 aes(x = Environment, y=UserReviews)) + geom_bar(stat = "identity", fill="darkgreen",colour="darkgrey")+
+    xlab("Ambience and Dietary restrictions") +
+    ylab("User reviews") +
+    theme_bw()+theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+barplt
 ```
 
-Slide With Plot
-========================================================
 
-```{r, echo=FALSE}
-plot(cars)
-```
+Results and discussion
+========================================================
+<font size="4"> First *Correlation is not causation*. Therefore, one should **ALWAYS** we very 
+careful when drawing conclusions from them. Because of this, and because of the
+smaller scale of this project, all the conclusions here will be expressed very
+conservativaly and should also be regarded as such. 
+
+When looking at previous slide we notice a few things:
+
+-  Not suprisingly there is a high tendency for dietary restrictions to pair up.
+-  Romantic users tend to be more upscale. This might not be so suprising as most
+people won't take their dates out on a cheap, fast-food restaurant.
+- Trendy people are more likely to be vegan and eat soy free.
+- Casual users are less likely to be classy, hispters or trendy.
+
+Having this information could be an important tool for some businesses to adjust more to 
+their clients needs. For example, using the second conclusion, upscale 
+restaurants could focus specifically on advertising romantic dinners for two.
+
+This is just a small example of the amount of information that could be locked in this
+data set alone so imagine what could be learned if it was enriched with other data
+like geospatial information of social network interests.</font>
